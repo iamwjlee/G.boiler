@@ -35,10 +35,14 @@
 u16 g_ext0=0;
 u16 g_ext1=0;
 u8 g_bit=0;
-u8 g_timer0=0;
+u16 g_timer0=0;
+u8 timer0_1000msec=0;
+u8 timer0_30msec=0;
+u8 timer0_1msec=0;
+u8 timer0_10msec_on=0;
 u8 timer0_30msec_on=0;
-u8   timer0_tick_of_10msec=0;
-u8  timer0_tick_of_1msec=0;
+u8 timer0_1000msec_on=0;
+
 
 u16 timer2_tick_of_2msec=0;
 u16 timer4_tick_of_10msec=0;
@@ -50,8 +54,7 @@ u8 toggle_7seg_digit=0;
 u8 key;
 u8 hot_cold_key_pressed=0;
 u16 event_time_tick=0;
-u8 g_timer10m=0;
-u8 g_timer50m=0;
+//u8 g_timer50m=0;
 u8 g_timer1sec=0;
 
 
@@ -127,22 +130,28 @@ void INT_Timer0() interrupt 12
 	// 10 msec
 	// 1msec
 	g_timer0++;
-	g_timer10m++;
-	timer0_tick_of_1msec++;
-	if(timer0_tick_of_1msec >= 10)
+	if(++timer0_1msec >= 10)
 	{
-		timer0_tick_of_1msec=0;
-		if(++timer0_tick_of_10msec >= 3)
+		timer0_1msec=0;
+		timer0_10msec_on=1;
+		if(++timer0_30msec >= 3)
 		{
-			timer0_tick_of_10msec=0;
+			timer0_30msec=0;
 			timer0_30msec_on=1;
 
+		}
+		if(++timer0_1000msec >=100)
+		{
+		
+			timer0_1000msec=0;
+			timer0_1000msec_on=1
 		}
 
 	}
 
-	if(power_on==1)
+	if(power_on==1 && timer0_10msec_on==1)
 	{
+		timer0_10msec_on=0;
 
 		if(heater_op) 		HEATER_CONTROL_LED=1;
 		if( cold_op )  COLD_CONTROL_LED=1;
@@ -184,21 +193,22 @@ void INT_Timer0() interrupt 12
 	}
 	
 	/* check key input */
-	if(g_timer10m >=5)  //50 msec
+	if(timer0_30msec_on==1)  //30 msec
 	{
-		g_timer50m++;
-		g_timer10m=0;
+		timer0_30msec_on=0;
+		//g_timer50m++;
 
 		if(POWER_SW_PIN==0)	key= KEY_POWER;
 		else if(HOT_COLD_SW_PIN==0)	{
 			if(hot_cold_key_pressed==0)
 			{
-				event_time_tick=g_timer0+200;   //pb!
+				//event_time_tick=g_timer0+2000;   //pb!
+				g_timer0 = 0;
 				hot_cold_key_pressed=1;
 			}	
 			else
 			{
-				if(g_timer0 > event_time_tick)
+				if(g_timer0 > 2000)
 				{
 					hot_cold_key_pressed=0;
 					key= KEY_HOT_COLD;
@@ -665,9 +675,9 @@ void main_loop(u8 key)
 			//if(1sec )
 			//error_set_toggle=~error_set_toggle;
 			error_set_toggle^=0x01;
-			if(g_timer50m>40)  //2sec
+			if(timer0_1000msec_on==1)  // 1 second
 			{
-				g_timer50m=0;
+				timer0_1000msec_on=0;
 
 				/* check if pump is working well */
 				if( g_ext1 > 50)   	
