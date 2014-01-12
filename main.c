@@ -36,6 +36,10 @@ u16 g_ext0=0;
 u16 g_ext1=0;
 u8 g_bit=0;
 u8 g_timer0=0;
+u8 timer0_30msec_on=0;
+u8   timer0_tick_of_10msec=0;
+u8  timer0_tick_of_1msec=0;
+
 u16 timer2_tick_of_2msec=0;
 u16 timer4_tick_of_10msec=0;
 
@@ -77,13 +81,13 @@ u8 error_set_toggle=0;
 void display_7seg(u8 c);
 
 
-/*
-	8M/12=666666hz
-	1/666666hz=1.5usec
-
-*/
 void wait(u8 d)
 {
+	
+	/*--------------------
+		8M/12=666666hz
+		1/666666hz=1.5usec
+	----------------------*/
 	u16 i,j;
 	for(i=0;i<d;i++)
 		for(j=0;j<6666;j++); //10msec
@@ -121,9 +125,21 @@ void INT_Ext1() interrupt 1
 void INT_Timer0() interrupt 12
 {
 	// 10 msec
+	// 1msec
 	g_timer0++;
 	g_timer10m++;
+	timer0_tick_of_1msec++;
+	if(timer0_tick_of_1msec >= 10)
+	{
+		timer0_tick_of_1msec=0;
+		if(++timer0_tick_of_10msec >= 3)
+		{
+			timer0_tick_of_10msec=0;
+			timer0_30msec_on=1;
 
+		}
+
+	}
 
 	if(power_on==1)
 	{
@@ -245,11 +261,9 @@ void clock_init()
 void Timer0_init()
 {
 	// initialize Timer0
-	// 16bit timer, period = 10.000000mS
-	T0CR = 0x92;    	// stop & timer setting
-	T1CR = 0xBF;    	// 16bit
-	T1DR = 0x02;    	// period count High
-	T0DR = 0x70;    	// period count Low
+	// 8bit timer, period = 1.000000mS
+	T0CR = 0x8E;    	// stop & timer setting
+	T0DR = 0xF9;    	// period count
 	IEN2 |= 0x01;   	// Enable Timer0 interrupt
 	T0CR |= 0x01;   	// start
 }
