@@ -1,0 +1,11 @@
+# ignore example
+obj
+prj
+*.bak
+*.Administrator
+*.dep
+*.plg
+*.swp
+*.uvopt
+*.uvproj
+*.wj
