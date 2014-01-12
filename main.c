@@ -28,81 +28,18 @@
 */
 #include	"MC95FG308.h"
 #include	"func_def.h"
+#include  "my.h"
 
 
-typedef  unsigned char u8;
-typedef unsigned short u16;
-
-#define ON 1
-#define OFF 0
-
-#define FND_10 P24
-#define FND_1 P23
-#define  FND_LED P16
-#define  FND_A  P37
-#define  FND_B  P36
-#define  FND_C  P35
-#define  FND_D  P34
-#define  FND_E  P15
-#define  FND_F  P14
-#define  FND_G  P13
-
-#define  POWER_SW_PIN P30
-#define  HOT_COLD_SW_PIN P31
-#define  CONT_OP_SW_PIN P32
-#define  TIME_OP_SW_PIN P33
-#define  DOWN_SW_PIN P04
-#define  UP_SW_PIN P05
-
-
-#define  WATER_SENSE_PIN P12
-#define BUZZER_PIN P02
-
-
-#define HEATER_CONTROL P25
-#define COLD_CONTROL P03
-#define PUMP_CONTROL P26
-
-enum input_key
-{
-	
-	KEY_IDLE,
-	KEY_POWER,
-	KEY_HOT_COLD,
-	KEY_CONT_OP,
-	KEY_TIME_OP,
-	KEY_DOWN,
-	KEY_UP
-};
-
-enum STATE
-{
-	POWER_ON,
-	POWER_OFF,
-	HOT,
-	COLD,
-	CONTINUOUS_MODE,
-	TIMER_MODE,
-	IDLE
-};
-
-void wait(int d)
-{
-	u16 i,j;
-	for(i=0;i<d;i++)
-		for(j=0;j<0xf100;j++);
-}
 
 u16 g_ext0=0;
 u16 g_ext1=0;
 u8 g_bit=0;
 u8 g_timer0=0;
-u8 g_timer2=0;
-u8 g_timer4=0;
+u16 timer2_tick_of_2msec=0;
+u16 timer4_tick_of_10msec=0;
 
-/* code size ++ */ 
 //code u8 digit[11]={0x7E,0x30,0x6D,0x79,0x33,0x5B,0x5F,0x70,0x7F,0x7B};
-/* data size ++ */
 u8 digit[12]={0x7E,0x30,0x6D,0x79,0x33,0x5B,0x5F,0x70,0x7F,0x7B,0x4f};
 u8 toggle_7seg_digit=0;
 
@@ -139,6 +76,32 @@ u8 error_set_toggle=0;
 
 void display_7seg(u8 c);
 
+
+/*
+	8M/12=666666hz
+	1/666666hz=1.5usec
+
+*/
+void wait(u8 d)
+{
+	u16 i,j;
+	for(i=0;i<d;i++)
+		for(j=0;j<6666;j++); //10msec
+}
+
+void timer2_delay (u16 tick) {
+  u16 timetick;
+
+  timetick = timer2_tick_of_2msec=0;
+  while ((timer2_tick_of_2msec - timetick) < tick);
+}
+
+void timer4_delay (u16 tick) {
+ timer4_tick_of_10msec=0;
+  while (timer4_tick_of_10msec  < tick);
+}
+
+
 //======================================================
 // interrupt routines
 //======================================================
@@ -165,9 +128,9 @@ void INT_Timer0() interrupt 12
 	if(power_on==1)
 	{
 
-		if(heater_op) 		HEATER_CONTROL=1;
-		if( cold_op ) COLD_CONTROL=1;
-		if( pump_op) PUMP_CONTROL=1;
+		if(heater_op) 		HEATER_CONTROL_LED=1;
+		if( cold_op )  COLD_CONTROL_LED=1;
+		if( pump_op) PUMP_CONTROL_LED=1;
 
 		
 		FND_LED=0;
@@ -236,15 +199,15 @@ void INT_Timer0() interrupt 12
 		}
 	}
 
-	HEATER_CONTROL=0;
-	COLD_CONTROL=0;
-	PUMP_CONTROL=0;
+	HEATER_CONTROL_LED=0;
+	COLD_CONTROL_LED=0;
+	PUMP_CONTROL_LED=0;
 }
 
 void INT_Timer2() interrupt 14
 {
 	// Timer2 interrupt
-	g_timer2++;
+	timer2_tick_of_2msec++;
 
 	//FND_LED=0;
 	//FND_A = 0;
@@ -254,7 +217,7 @@ void INT_Timer4() interrupt 16
 {
 	// Timer4 interrupt
 	
-	g_timer4++;
+	timer4_tick_of_10msec++;
 }
 void INT_BIT() interrupt 22
 {
@@ -427,13 +390,6 @@ void port_init()
 	PSR1 = 0x00;    	// I2C, AN14 ~ AN8
 }
 
-
-void delay (u16 tick) {
-  u16 timetick;
-
-  timetick = g_timer4;
-  while ((g_timer4 - timetick) < tick);
-}
 void display_led(u8 cont_op,u8 time_op, u8 hot_set,u8 cold_set,u8 err_set)
 {
 	
@@ -518,18 +474,6 @@ void display_7seg(u8 c)
 
 	FND_1=1;
 	FND_10=1;
-}
-u8 get_key()
-{
-	if(POWER_SW_PIN==0)	return KEY_POWER;
-	else if(HOT_COLD_SW_PIN==0)	return KEY_HOT_COLD;
-	else if(CONT_OP_SW_PIN==0)	return KEY_CONT_OP;
-	else if(TIME_OP_SW_PIN==0)	return KEY_TIME_OP;
-	else if(DOWN_SW_PIN==0)	return KEY_DOWN;
-	else if(UP_SW_PIN==0)	return KEY_UP;
-	else {
-		return KEY_IDLE;
-	}
 }
 
 #define MR_EEPROM 0x40
@@ -761,23 +705,23 @@ void main_loop(u8 key)
 							if(adc_temperature  > temperature ) 	
 							{
 								heater_op=0;
-								//HEATER_CONTROL=OFF;
+								//HEATER_CONTROL_LED=OFF;
 							}	
 							else if(adc_temperature < temperature ) 
 							{
 								heater_op=1;
-								//HEATER_CONTROL=ON;
+								//HEATER_CONTROL_LED=ON;
 							}	
 						}
 						else
 						{
 							if(adc_temperature  > temperature ) 	
 							{
-								cold_op=1;    //COLD_CONTROL=ON;
+								cold_op=1;    //COLD_CONTROL_LED=ON;
 							}	
 							else if(adc_temperature < temperature ) 	
 							{
-								cold_op=0;   //COLD_CONTROL=OFF;
+								cold_op=0;   //COLD_CONTROL_LED=OFF;
 							}	
 						}
 					}
@@ -803,21 +747,13 @@ void fnd_test_code()
 
 }
 
-void pio_test_code()
-{
-
-
-}
-void timer_test_code()
-{
-
-}
 void interrupt_test_code()
 {
 
 }
 void adc_test_code()
-{
+{
+
 
 }
 void eeprom_test_code()
@@ -861,7 +797,7 @@ void main()
 	FND_10=1;
 	FND_LED=1;
 	
-	delay(10); //100msec
+	wait(100); //10msec * x
 
 	while(1)
 	{
@@ -882,7 +818,7 @@ void main()
 			
 		}
 #else
-		delay(10); //100msec
+		wait(2); //10msec * x
 		button=get_key();
 #endif
 	}

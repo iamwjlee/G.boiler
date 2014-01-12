@@ -38,7 +38,7 @@ n more detail, the receiver's interrupt code is called every time the TIMER1 ove
 */
 #include	"MC95FG308.h"
 #include	"func_def.h"
-
+#include  "my.h"
 
 enum ir_status
 {
@@ -47,7 +47,8 @@ enum ir_status
 	CUSTOM_DETECT,
 	DATA_DETECT
 	
-}
+};
+
 u8 ir_state;
 u8 ir_key_data;
 u8 ir_repeat_key;
@@ -62,8 +63,8 @@ void timer_interrupt(void)
 	// at each interrupt, the input status is checked and the timer counter is incremented.
 	// 
 	timer_1msec++;
-	tick_of_1msec ++;
-	tick_of_500usec ++;
+	//tick_of_1msec ++;
+	//tick_of_500usec ++;
 
 
 }
@@ -77,6 +78,8 @@ void timer_interrupt(void)
 void ir_interrupt(void)
 {
 	u8 interval;
+	u8 odata; 
+	u8 ndata; // = ~(ir_data>>8); 
 
 	
 	interval=timer_1msec;
@@ -87,7 +90,7 @@ void ir_interrupt(void)
 		ir_data=0;
 		ir_state= LEADER_DETECT;
 	}	
-	else if(ir_state = LEADER_DETECT)
+	else if(ir_state == LEADER_DETECT)
 	{
 		if(interval>12 && interval <14)  /* reference 13.5 ms */
 		{
@@ -118,9 +121,11 @@ void ir_interrupt(void)
 		ir_data_mask <<= 1;
 		if(ir_data_mask==0)
 		{
-			u8 data = ir_data;
-			u8 ndata = ~(ir_data>>8); 
-			if(data == ndata)
+			//u8 data; 
+			//u8 ndata; // = ~(ir_data>>8); 
+			odata = ir_data;
+			ndata= ~(ir_data>>8); 
+			if(odata == ndata)
 			{
 			//if(ir_data == correct custom address)
 				ir_data=0;
@@ -144,12 +149,15 @@ void ir_interrupt(void)
 		ir_data_mask <<= 1;
 		if(ir_data_mask==0)
 		{
-			u8 data = ir_data;
-			u8 ndata = ~(ir_data>>8); 
-			if(data == ndata)
+			//u8 odata = ir_data;
+			//u8 ndata = ~(ir_data>>8); 
+			
+			odata = ir_data;
+			ndata= ~(ir_data>>8); 
+			if(odata == ndata)
 			{
-			   ir_key_data = data;	
-			   ir_repeat_key = data;
+			   ir_key_data = odata;	
+			   ir_repeat_key = odata;
 			}
 			ir_state = INIT;
 		}
