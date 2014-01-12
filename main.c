@@ -766,7 +766,6 @@ void remocon_test_code()
 }
 void main()
 {
-	u8 button;
 
 	/* form eeprom */
 	temperature=28;
@@ -819,7 +818,7 @@ void main()
 		}
 #else
 		wait(2); //10msec * x
-		button=get_key();
+		get_key_action();
 #endif
 	}
 	
