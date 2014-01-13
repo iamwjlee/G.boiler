@@ -12,3 +12,7 @@ prj
 *.Uv2
 *.Opt
 *.pdf
+*.obj
+*.lst
+*.M51
+*.lnp
