@@ -35,51 +35,55 @@
 u16 g_ext0=0;
 u16 g_ext1=0;
 u8 g_bit=0;
+
+/* timer0 */
 u16 g_timer0=0;
 u8 timer0_1000msec=0;
 u8 timer0_30msec=0;
 u8 timer0_1msec=0;
+
 u8 timer0_10msec_on=0;
 u8 timer0_30msec_on=0;
 u8 timer0_1000msec_on=0;
 
 
+/* timer2 */
 u16 timer2_tick_of_2msec=0;
+
+/* timer4 */
 u16 timer4_tick_of_10msec=0;
 
-//code u8 digit[11]={0x7E,0x30,0x6D,0x79,0x33,0x5B,0x5F,0x70,0x7F,0x7B};
-u8 digit[12]={0x7E,0x30,0x6D,0x79,0x33,0x5B,0x5F,0x70,0x7F,0x7B,0x4f};
-u8 toggle_7seg_digit=0;
 
-u8 key;
-u8 hot_cold_key_pressed=0;
-u16 event_time_tick=0;
-//u8 g_timer50m=0;
-u8 g_timer1sec=0;
-
-
-u8 reservation_time;
-u8 temperature;	
-//u8 status;
-
-/* left side led */
+/* Left side led status */
 u8 power_on=0; //power on or off
 u8 heater_op=0;
 u8 pump_op=0;
 u8 cold_op=0;
 
-/* right side  led */
+/* right side  led status */
 u8 continuous_op_set=0; //cont or timer
 u8 hot_op_set=0;  //hot or cold
 u8 error_set=0;  //normal or error
 
-u8 water_shortage =0;
+/* etc */
+u8 key;  /* input of button */
+u8 temperature;	    //measured temperatue
+u8 water_shortage =0;  //water sense
 u8 temperature_sense_defect =0;
-
+u8 reservation_time;  //for time reservation
 u16 current_time;  //for time reservation
 
-u16 error_set_time_tick=0;
-u8 error_set_toggle=0;
+u8 error_led_toggle=0;  /*for blink error led */
+u8 hot_cold_key_pressed=0; /*if pressed above 2seconds */
+u8 tick10m_for_long_key=0;  /*if pressed above 2seconds */
+
+//code u8 FND_DIGIT[11]={0x7E,0x30,0x6D,0x79,0x33,0x5B,0x5F,0x70,0x7F,0x7B};
+u8  FND_DIGIT[12]={0x7E,0x30,0x6D,0x79,0x33,0x5B,0x5F,0x70,0x7F,0x7B,0x4f};
+u8 toggle_fnd_digit=0;  /* for toggle two 7segment  */
+
+
+rtc_t myclock;
+
 
 void display_7seg(u8 c);
 
@@ -127,28 +131,31 @@ void INT_Ext1() interrupt 1
 
 void INT_Timer0() interrupt 12
 {
-	// 10 msec
 	// 1msec
 	g_timer0++;
 	if(++timer0_1msec >= 10)
 	{
+		/* 10msec */
+		tick10m_for_long_key++;
 		timer0_1msec=0;
 		timer0_10msec_on=1;
 		if(++timer0_30msec >= 3)
 		{
+			/* 30msece */
 			timer0_30msec=0;
 			timer0_30msec_on=1;
 
 		}
 		if(++timer0_1000msec >=100)
 		{
-		
+			/* 1 sec */
 			timer0_1000msec=0;
-			timer0_1000msec_on=1
+			timer0_1000msec_on=1;
 		}
 
 	}
 
+	/* Display FND and LED(continuous op,time op, hot set,cold set, error) */
 	if(power_on==1 && timer0_10msec_on==1)
 	{
 		timer0_10msec_on=0;
@@ -156,7 +163,10 @@ void INT_Timer0() interrupt 12
 		if(heater_op) 		HEATER_CONTROL_LED=1;
 		if( cold_op )  COLD_CONTROL_LED=1;
 		if( pump_op) PUMP_CONTROL_LED=1;
-
+		NOP;
+		HEATER_CONTROL_LED=0;
+		COLD_CONTROL_LED=0;
+		PUMP_CONTROL_LED=0;
 		
 		FND_LED=0;
 		if(continuous_op_set) FND_A = 0; //cont_operation
@@ -165,13 +175,8 @@ void INT_Timer0() interrupt 12
 		else FND_D = 0; //cold set
 		if(error_set==1) 
 		{
-
-			if(!error_set_toggle)
-			FND_E = 0;  // Error
-			//error_set_time_tick=g_timer1sec+100;
-			//g_timer1sec++;
-				
-			
+			if(!error_led_toggle)
+			FND_E = 0;  // For Error LED
 		}	
 		NOP;
 		FND_LED=1;
@@ -190,25 +195,24 @@ void INT_Timer0() interrupt 12
 			else
 				display_7seg(reservation_time);
 		}	
+		
 	}
 	
 	/* check key input */
 	if(timer0_30msec_on==1)  //30 msec
 	{
 		timer0_30msec_on=0;
-		//g_timer50m++;
 
 		if(POWER_SW_PIN==0)	key= KEY_POWER;
 		else if(HOT_COLD_SW_PIN==0)	{
 			if(hot_cold_key_pressed==0)
 			{
-				//event_time_tick=g_timer0+2000;   //pb!
-				g_timer0 = 0;
+				tick10m_for_long_key = 0;
 				hot_cold_key_pressed=1;
 			}	
 			else
 			{
-				if(g_timer0 > 2000)
+				if(tick10m_for_long_key >= 200)
 				{
 					hot_cold_key_pressed=0;
 					key= KEY_HOT_COLD;
@@ -219,15 +223,13 @@ void INT_Timer0() interrupt 12
 		else if(TIME_OP_SW_PIN==0)	 key= KEY_TIME_OP;
 		else if(DOWN_SW_PIN==0)	key= KEY_DOWN;
 		else if(UP_SW_PIN==0)	key= KEY_UP;
-		else {
-		hot_cold_key_pressed=0;
-		key= KEY_IDLE;
+		else 
+		{
+			hot_cold_key_pressed=0;
+			key= KEY_IDLE;
 		}
 	}
 
-	HEATER_CONTROL_LED=0;
-	COLD_CONTROL_LED=0;
-	PUMP_CONTROL_LED=0;
 }
 
 void INT_Timer2() interrupt 14
@@ -235,8 +237,6 @@ void INT_Timer2() interrupt 14
 	// Timer2 interrupt
 	timer2_tick_of_2msec++;
 
-	//FND_LED=0;
-	//FND_A = 0;
 }
 
 void INT_Timer4() interrupt 16
@@ -345,10 +345,10 @@ u8 ADC_read2(unsigned int *adcVal)
 void ADC_init()
 {
 	// initialize A/D convertor
-	ADCM = 0x00;    	// setting
-	ADCM2 = 0x00;   	// trigger source, alignment, frequency
-	/* fx/4   3v~5v*/
-	//ADCM2 = 0x01;   	// trigger source, alignment, frequency
+	ADCM = 0x01;    	// setting   AN1
+	//ADCM2 = 0x00;   	// trigger source, alignment, frequency
+	/* fx/4   is for avref 3v~5v */
+	ADCM2 = 0x01;   	// trigger source, alignment, frequency
 }
 
 void ADC_start(unsigned char ch)
@@ -361,11 +361,12 @@ void ADC_start(unsigned char ch)
 void port_init()
 {
 	// initialize ports
-	//  23 : P00      o 
 	/* 
-		input : p32,p32,p33,p44,p04,p05  for  s/w0 -5
-
-			p01 : temp sence 
+	   INPUT :0 OUTPUT :1 SETTING
+	   
+		input : 
+			p32,p32,p33,p44,p04,p05  for  s/w0 -5
+			p01 : AN1 temp sence  
 			p10/int0 : remocon
 			p11/int1 : pump sence
 			p12 : water sence
@@ -469,28 +470,27 @@ void display_7seg(u8 c)
 		seg10 = c/10;
 		seg1 = c%10;
 	}
-	
-	if(toggle_7seg_digit==0)
+
+	toggle_fnd_digit ^= 0x01;
+
+	if(toggle_fnd_digit==0)
 	{
 		FND_1=0;
 		val=seg1;
-		toggle_7seg_digit=1;
 	}	
 	else
 	{
-		
 		FND_10=0;
 		val=seg10;
-		toggle_7seg_digit=0;
 	}	
 	
-	FND_G=~digit[val]&0x01;	
-	FND_F=~digit[val]>>1& 0x01;	
-	FND_E=~digit[val]>>1& 0x01;	
-	FND_D=~digit[val]>>1&0x01;	
-	FND_C=~digit[val]>>1&0x01;	
-	FND_B=~digit[val]>>1&0x01;	
-	FND_A=~digit[val]>>1&0x01;	
+	FND_G=~FND_DIGIT[val]&0x01;	
+	FND_F=~FND_DIGIT[val]>>1& 0x01;	
+	FND_E=~FND_DIGIT[val]>>1& 0x01;	
+	FND_D=~FND_DIGIT[val]>>1&0x01;	
+	FND_C=~FND_DIGIT[val]>>1&0x01;	
+	FND_B=~FND_DIGIT[val]>>1&0x01;	
+	FND_A=~FND_DIGIT[val]>>1&0x01;	
 	
 	NOP;
 	NOP;
@@ -500,114 +500,31 @@ void display_7seg(u8 c)
 	FND_10=1;
 }
 
-#define MR_EEPROM 0x40
-#define MR_PROGRAM_ERASE 0x01
-#define MR_PBUFF 0x08
-#define MR_PROGRAM_VFY 0x20
-//#define MR_ERASE_VFY 0x10
-#define MR_ERASE 0x10
-#define MR_PGM 0x20
-
-#define CR_RESET 0x02
-#define CR_EXIT 0x30
-#define CR_READ 0x04
-
-#define SR_FLAG 0x80
-
-
-void enable_program_mode(u8 option)
+void keep_time(u8 start)
 {
-	if(option==1)
+	if(start==0)
 	{
-		FEDR = 0xa5;
-		FEDR = 0x5a;
-
+		myclock.sec=0;
+		myclock.days=0;
+		myclock.hour=0;
+		myclock.min=0;
 	}
 	else
 	{
-		FECR=CR_EXIT;
-	}
-
-}
-void ee_page_read()
-{
-	u8 i;
-	u8 d[8];
-	enable_program_mode(1);
-	
-	/* select page buffer */
-	FEMR =MR_EEPROM|MR_PROGRAM_ERASE| MR_PBUFF;
-
-	for(i=0;i<8;i++)
-	{
-		d[i]=FEDR;
-		FEMR |=CR_READ;
-		NOP;
+		if(++myclock.sec == 60)
+		{
+			myclock.sec = 0;
+			if(++myclock.min == 60)
+			{
+				myclock.min = 0;
+				if(++myclock.hour == 24)
+				{
+					myclock.hour = 0;
+					myclock.days++;
+				}
+			}
+		}
 	}	
-	enable_program_mode(0);
-
-}
-void ee_page_erase()
-{
-	enable_program_mode(1);
-
-	/* reset page buffer */
-	FEMR = MR_EEPROM|MR_PROGRAM_ERASE;
-	FECR = CR_RESET;
-
-	
-	/* select page buffer */
-	FEMR =MR_EEPROM|MR_PROGRAM_ERASE| MR_PBUFF;
-
-	/* write something to page buffer */
-	FEDR = 0;
-	/* set erase mode */
-	FEMR = MR_EEPROM | MR_ERASE|MR_PROGRAM_ERASE;
-	/* set page address. one page=16bytes */
-	FEARH=0x0;	//?
-	FEARM=0x00;
-	FEARL=0x00;
-	/* set Timer Control Register */
-	FETCR =0x1f;
-	/* start erase */
-	FECR = 0x0b;
-	NOP;
-	
-	/* check status flag==1 */
-	while(!FESR&SR_FLAG);
-	enable_program_mode(0);
-
-}
-
-void ee_page_write()
-{
-	enable_program_mode(1);
-	
-	/* reset page buffer */
-	FEMR = MR_EEPROM|MR_PROGRAM_ERASE;
-	FECR = CR_RESET;
-	/* select page buffer */
-	FEMR =MR_EEPROM|MR_PROGRAM_ERASE| MR_PBUFF;
-	/* write something to page buffer */
-	FEDR = 0x77;  //??
-	/* set write mode */
-	FEMR= MR_EEPROM|MR_PGM|MR_PROGRAM_ERASE;
-
-
-	/* set page address. one page=16bytes */
-	FEARH=0x0;	//?
-	FEARM=0x00;
-	FEARL=0x00;
-	/* set Timer Control Register */
-	FETCR =0x1f;
-	/* start program or erase */
-	FECR = 0x0b;
-	NOP;
-	
-	/* check status flag==1 */
-	while(!FESR&SR_FLAG);
-	enable_program_mode(0);
-
 }
 
 
@@ -672,12 +589,11 @@ void main_loop(u8 key)
 			break;
 		case KEY_IDLE:
 
-			//if(1sec )
-			//error_set_toggle=~error_set_toggle;
-			error_set_toggle^=0x01;
 			if(timer0_1000msec_on==1)  // 1 second
 			{
 				timer0_1000msec_on=0;
+
+				error_led_toggle^=0x01;
 
 				/* check if pump is working well */
 				if( g_ext1 > 50)   	
@@ -751,9 +667,11 @@ void main_loop(u8 key)
 					}
 					
 				}
+				if(reservation_time)  keep_time(1);
+				else keep_time(0);
 			}
 
-			if(reservation_time * 60 < current_time )
+			if(reservation_time * 60 < (myclock.min + myclock.hour*60) && continuous_op_set ==0 )
 			{
 				power_on=0;
 			}
@@ -836,8 +754,10 @@ void main()
 			{
 				current_time=0;
 				power_on=1;
+				
 			}	
-			/*  check temperature < 2 dgree for freezing    */
+			keep_time(0);
+			/*  Need something for freeze protection    */
 			
 		}
 #else

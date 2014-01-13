@@ -18,7 +18,7 @@
 	Data bit 0(1.125m): 0.56m  + sapce
 
 	Falling edge interrupt 
-	     _	      	____        _______
+     _	      	____        _______
 		|      	|     |||  |
 		|      	|	|||  |
 		|______|	|||_|
@@ -53,7 +53,7 @@ u8 ir_state;
 u8 ir_key_data;
 u8 ir_repeat_key;
 
-u8 timer_1msec=0;
+u8 tick1m_for_ir =0;
 u16 ir_data=0;
 u16 ir_data_mask=0;
 void timer_interrupt(void)
@@ -62,7 +62,7 @@ void timer_interrupt(void)
 	// This is called by every time the timer overflows, which is set to happen after 1msecond. 
 	// at each interrupt, the input status is checked and the timer counter is incremented.
 	// 
-	timer_1msec++;
+	tick1m_for_ir++;
 	//tick_of_1msec ++;
 	//tick_of_500usec ++;
 
@@ -78,12 +78,12 @@ void timer_interrupt(void)
 void ir_interrupt(void)
 {
 	u8 interval;
-	u8 odata; 
-	u8 ndata; // = ~(ir_data>>8); 
+	u8 code8; 
+	u8 edoc8; 
 
 	
-	interval=timer_1msec;
-	timer_1msec=0;
+	interval=tick1m_for_ir;
+	tick1m_for_ir=0;
 
 	if(ir_state == INIT)
 	{
@@ -121,13 +121,10 @@ void ir_interrupt(void)
 		ir_data_mask <<= 1;
 		if(ir_data_mask==0)
 		{
-			//u8 data; 
-			//u8 ndata; // = ~(ir_data>>8); 
-			odata = ir_data;
-			ndata= ~(ir_data>>8); 
-			if(odata == ndata)
+			code8 = ir_data;
+			edoc8= ~(ir_data>>8); 
+			if(code8 == edoc8)
 			{
-			//if(ir_data == correct custom address)
 				ir_data=0;
 				ir_data_mask=0x0001;
 				ir_state = DATA_DETECT;
@@ -149,15 +146,13 @@ void ir_interrupt(void)
 		ir_data_mask <<= 1;
 		if(ir_data_mask==0)
 		{
-			//u8 odata = ir_data;
-			//u8 ndata = ~(ir_data>>8); 
 			
-			odata = ir_data;
-			ndata= ~(ir_data>>8); 
-			if(odata == ndata)
+			code8 = ir_data;
+			edoc8= ~(ir_data>>8); 
+			if(code8 == edoc8)
 			{
-			   ir_key_data = odata;	
-			   ir_repeat_key = odata;
+			   ir_key_data = code8;	
+			   ir_repeat_key = code8;
 			}
 			ir_state = INIT;
 		}

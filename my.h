@@ -114,6 +114,57 @@ enum STATE
 	IDLE
 };
 
+#if 0
+typedef struct 
+{
+	union
+	{
+		struct {
+			unsigned char bit0:1;
+			unsigned char bit1:1;
+			unsigned char bit2:1;
+			unsigned char bit3:1;
+			unsigned char bit4:1;
+			unsigned char bit5:1;
+			unsigned char bit6:1;
+			unsigned char bit7:1;
+		} ;
+		unsigned char byte;
+	};
+} EightBits;
+//EightBits my_bytes;
+#endif
+
+#if 0
+//
+u8bdata aaa;
+	sbit aaa0 = aaa ^ 0;
+	sbit aaa1 = aaa ^ 1;
+	sbit aaa2 = aaa ^ 2;
+	sbit aaa3 = aaa ^ 3;
+	sbit aaa4 = aaa ^ 4;
+	sbit aaa5 = aaa ^ 5;
+	sbit aaa6 = aaa ^ 6;
+	sbit aaa7 = aaa ^ 7;
+
+#endif
+/*  2 byte
+bit bit_test0;
+bit bit_test1;
+bit bit_test2;
+bit bit_test3;
+*/
+bit bit_test0;
+bit bit_test1;
+	
+typedef struct
+{
+	u8	hour;
+	u8	min;
+	u8	sec;
+	u8	days;
+} rtc_t;
+
 
 /* macros --------------------------------------------------------------------- */
 
