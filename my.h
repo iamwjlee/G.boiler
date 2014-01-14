@@ -47,6 +47,9 @@ typedef unsigned char  U8;
 typedef  unsigned char u8;
 typedef unsigned short u16;
 
+#define MAX_TEMPERATURE 60
+#define TEMPERATURE_RATIO  (0xfff/MAX_TEMPERATURE)
+
 #define ON 1
 #define OFF 0
 
@@ -154,8 +157,9 @@ bit bit_test1;
 bit bit_test2;
 bit bit_test3;
 */
-bit bit_test0;
-bit bit_test1;
+// *** ERROR L104: MULTIPLE PUBLIC DEFINITIONS
+//bit bit_test0;
+//bit bit_test1;
 	
 typedef struct
 {

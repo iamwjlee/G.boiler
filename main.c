@@ -4,8 +4,6 @@
 // - Package type : 32LQFP
 //======================================================
 
-// Generated    : Tue, Jan 07, 2014 (14:20:09)
-
 /*
 	register addressing mode
 		add ax,bx
@@ -24,12 +22,42 @@
 		ea=(((a)))
 		
 
+	Left side led
+		power led 
+		heater led 
+		pump led
+		cold led
+	Right side Led
+		cont operation led
+		time operation led 
+		hot set led
+		cold set led
+		error led
+
+	Bottom side s/w
+		power s/w
+		hot/cold set
+		cont op
+		time op
+		down
+		up 
+		
+	FND 
+		7SEG * 2
+			
 
 */
+
 #include	"MC95FG308.h"
 #include	"func_def.h"
 #include  "my.h"
 
+
+
+bit bit_a;
+bit bit_b;
+bit bit_c;
+bit bit_d;
 
 
 u16 g_ext0=0;
@@ -49,29 +77,35 @@ u8 timer0_1000msec_on=0;
 
 /* timer2 */
 u16 timer2_tick_of_2msec=0;
-
+u16 timer2_2msec=0;
 /* timer4 */
 u16 timer4_tick_of_10msec=0;
 
 
 /* Left side led status */
-u8 power_on=0; //power on or off
-u8 heater_op=0;
-u8 pump_op=0;
-u8 cold_op=0;
+u8 heater_op=0;  // heater on or off according to temperature
+u8 pump_op=0;   // indicator whether pump is working well or not
+u8 cold_op=0;     //cold on or off according to temperature
 
 /* right side  led status */
-u8 continuous_op_set=0; //cont or timer
-u8 hot_op_set=0;  //hot or cold
-u8 error_set=0;  //normal or error
+u8 continuous_op_set=0; //cont or timer mode indicator by user
+u8 hot_op_set=0;  //hot or cold mode indicator by user
+u8 error_set=0;  //normal or error status
+
+
 
 /* etc */
 u8 key;  /* input of button */
+u8 key_pressed;
+u8 key_released;
+
+u8 power_on=0; /* all led and fnd on and off */  
+
 u8 temperature;	    //measured temperatue
 u8 water_shortage =0;  //water sense
 u8 temperature_sense_defect =0;
 u8 reservation_time;  //for time reservation
-u16 current_time;  //for time reservation
+u8 reservation_time_changed=0;  //for time reservation
 
 u8 error_led_toggle=0;  /*for blink error led */
 u8 hot_cold_key_pressed=0; /*if pressed above 2seconds */
@@ -198,13 +232,18 @@ void INT_Timer0() interrupt 12
 		
 	}
 	
-	/* check key input */
+	/* check key input 
+		- Is it Okay even if key is pressed forever ?
+	*/
 	if(timer0_30msec_on==1)  //30 msec
 	{
 		timer0_30msec_on=0;
 
 		if(POWER_SW_PIN==0)	key= KEY_POWER;
 		else if(HOT_COLD_SW_PIN==0)	{
+			//
+		
+			//
 			if(hot_cold_key_pressed==0)
 			{
 				tick10m_for_long_key = 0;
@@ -228,6 +267,19 @@ void INT_Timer0() interrupt 12
 			hot_cold_key_pressed=0;
 			key= KEY_IDLE;
 		}
+		//
+		if(key!=KEY_IDLE) 
+		{
+			//evnet_notify(key,pressed)
+			key_pressed=1;
+			key_released =0;
+		}	
+		else 
+		{
+			//event_notify(key,released)
+			key_released =1;
+			key_pressed=0;
+		}	
 	}
 
 }
@@ -236,6 +288,7 @@ void INT_Timer2() interrupt 14
 {
 	// Timer2 interrupt
 	timer2_tick_of_2msec++;
+	timer2_2msec++;
 
 }
 
@@ -531,25 +584,24 @@ void keep_time(u8 start)
 void main_loop(u8 key)
 {
 	u16 adc_temperature;
+
+	if(key_pressed==1)
+	{
 	switch(key)
 	{
 		case KEY_POWER:
-	
 			/* power_off */
 			power_on=0;
-		
 			break;
 		case KEY_HOT_COLD:
 			if(hot_op_set==0)
 			{
 				/*hot */
-				
 				hot_op_set=1;
 			}
 			else
 			{
 				/* cold  */
-
 				hot_op_set=0;
 			}
 			break;
@@ -559,124 +611,132 @@ void main_loop(u8 key)
 			break;
 		case KEY_TIME_OP:
 			continuous_op_set=0;
-
 			break;
 		case KEY_DOWN:
 			if(continuous_op_set==1)
 			{
-				if(temperature > 10 && temperature <51)
+				if(temperature > 10 && temperature <MAX_TEMPERATURE)
 					temperature--;
 			}
 			else
 			{
 				if(reservation_time > 0 && temperature <13)
+				{
 					reservation_time--;
+					reservation_time_changed=1;
+				}	
 			}
 			break;
 		case KEY_UP:
 			if(continuous_op_set==1)
 			{
-				if(temperature > 10 && temperature <51)
+				if(temperature > 10 && temperature <MAX_TEMPERATURE)
 					temperature++;
 
 			}
 			else
 			{
 				if(reservation_time > 0 && temperature <13)
+				{
 					reservation_time++;
-
+					reservation_time_changed=1;
+				}	
 			}
 			break;
-		case KEY_IDLE:
+	}		
+	}
 
-			if(timer0_1000msec_on==1)  // 1 second
+	
+
+	if(timer0_1000msec_on==1)  // 1 second
+	{
+		timer0_1000msec_on=0;
+
+		error_led_toggle^=0x01;
+
+		/* check if pump is working well */
+		if( g_ext1 > 50)   	
+		{
+			g_ext1=0;
+			pump_op=1;	
+		}	
+		else 
+		{
+			g_ext1=0;
+			pump_op=0;
+		}	
+
+		/* check if water shortage */
+		if(WATER_SENSE_PIN==1)
+		{
+			water_shortage= 1;
+		}
+		else
+		{
+			water_shortage= 0;
+		}
+
+		/* buzzer set */
+		if(pump_op==0 || water_shortage==1||temperature_sense_defect==1)
+		{
+			BUZZER_PIN=1;
+			error_set=1;
+		}
+		else
+		{
+			
+			error_set=0;
+			BUZZER_PIN=0;
+		}
+		
+
+		if(!ADC_read2(&adc_temperature))
+		{
+			if(adc_temperature == 0x01 || adc_temperature > 0xfff )
 			{
-				timer0_1000msec_on=0;
-
-				error_led_toggle^=0x01;
-
-				/* check if pump is working well */
-				if( g_ext1 > 50)   	
+				temperature_sense_defect=1;
+			}
+			else 
+			{
+				adc_temperature /=TEMPERATURE_RATIO;
+				temperature_sense_defect=0;
+				if(hot_op_set==ON)
 				{
-					g_ext1=0;
-					pump_op=1;	
-				}	
-				else 
-				{
-					g_ext1=0;
-					pump_op=0;
-				}	
-
-				/* check if water shortage */
-				if(WATER_SENSE_PIN==1)
-				{
-					water_shortage= 1;
+					if(adc_temperature  > temperature ) 	
+					{
+						heater_op=0;
+					}	
+					else if(adc_temperature < temperature ) 
+					{
+						heater_op=1;
+					}	
 				}
 				else
 				{
-					water_shortage= 0;
-				}
-
-				/* buzzer set */
-				if(pump_op==0 || water_shortage==1||temperature_sense_defect==1)
-				{
-					BUZZER_PIN=1;
-					error_set=1;
-				}
-				else
-				{
-					
-					error_set=0;
-					BUZZER_PIN=0;
-				}
-				
-
-				if(!ADC_read2(&adc_temperature))
-				{
-					if(adc_temperature == 0x01 || adc_temperature > 0xfff )
+					if(adc_temperature  > temperature ) 	
 					{
-						temperature_sense_defect=1;
-					}
-					else 
+						cold_op=1;    
+					}	
+					else if(adc_temperature < temperature ) 	
 					{
-						temperature_sense_defect=0;
-						if(hot_op_set==ON)
-						{
-							if(adc_temperature  > temperature ) 	
-							{
-								heater_op=0;
-								//HEATER_CONTROL_LED=OFF;
-							}	
-							else if(adc_temperature < temperature ) 
-							{
-								heater_op=1;
-								//HEATER_CONTROL_LED=ON;
-							}	
-						}
-						else
-						{
-							if(adc_temperature  > temperature ) 	
-							{
-								cold_op=1;    //COLD_CONTROL_LED=ON;
-							}	
-							else if(adc_temperature < temperature ) 	
-							{
-								cold_op=0;   //COLD_CONTROL_LED=OFF;
-							}	
-						}
-					}
-					
+						cold_op=0;   
+					}	
 				}
-				if(reservation_time)  keep_time(1);
-				else keep_time(0);
 			}
+			
+		}
+		if(reservation_time_changed==1)
+		{
+			reservation_time_changed=0;
+			keep_time(0);
+		}
+		if(reservation_time && continuous_op_set ==0)  keep_time(1);
+		else keep_time(0);
+	}
 
-			if(reservation_time * 60 < (myclock.min + myclock.hour*60) && continuous_op_set ==0 )
-			{
-				power_on=0;
-			}
-				
-			break;
+	if(continuous_op_set ==0  && reservation_time * 60 < (myclock.min + myclock.hour*60)  )
+	{
+		power_on=0;
 	}
 
 }
@@ -684,10 +744,6 @@ void main_loop(u8 key)
 
 //unsigned char xdata my_xdata[50];
 
-void fnd_test_code()
-{
-
-}
 
 void interrupt_test_code()
 {
@@ -752,7 +808,6 @@ void main()
 		{
 			if(key==KEY_POWER) 
 			{
-				current_time=0;
 				power_on=1;
 				
 			}	
