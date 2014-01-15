@@ -18,13 +18,11 @@
 	Data bit 0(1.125m): 0.56m  + sapce
 
 	Falling edge interrupt 
-     _	      	____        _______
-		|      	|     |||  |
-		|      	|	|||  |
-		|______|	|||_|
+     _	      	     ____        _______
+		|      	     |     |||  |
+		|      	     |	  |||  |
+		|______ |	  |||_|
 		
-
-
 
 
 	
@@ -34,6 +32,18 @@ For decoding, the MATCH macro determine if the measured mark or space time is ap
 The RC5/6 decoding is a bit different from the others because RC5/6 encode bits with mark + space or space + mark, rather than by durations of marks and spaces. The getRClevel helper method splits up the durations and gets the mark/space level of a single time interval.
 
 n more detail, the receiver's interrupt code is called every time the TIMER1 overflows, which is set to happen after 50 microseconds. At each interrupt, the input status is checked and the timer counter is incremented. The interrupt routine times the durations of marks (receiving a modulated signal) and spaces (no signal received), and records the durations in a buffer. The first duration is the length of the gap before the transmission starts. This is followed by alternating mark and space measurements. All measurements are in "ticks" of 50 microseconds.
+
+
+http://stuff.mit.edu/afs/sipb/contrib/linux/drivers/media/rc/ir-rc6-decoder.c
+
+http://www.ustr.net/infrared/index.shtml
+
+
+You don't need to decode those first  two bits, not even the CHK bit (except if you want to control as the TV do and described above), so you can skip those 3 bits and start to receive the ADDRESS bits.  To do that, you need to skip 2.75 bits time, and you will be exactly at the middle of the right level of the first ADDRESS bit to be read (non inverted level).
+
+So, upon sensing the first low level, your software should wait 4.752 milliseconds and then start to read the next 11 bits spaced 1.728ms each.   The first 5 bits are Address and the next 6 bits are  Command, logic correct level, LOW = 0, HIGH = 1.
+
+To make sure your software is waiting the correct timing, you need to use a dual channel oscilloscope, and this procedure to adjust your software:
 
 */
 #include	"MC95FG308.h"
