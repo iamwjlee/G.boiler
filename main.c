@@ -5,6 +5,9 @@
 //======================================================
 
 /*
+
+	http://www.abov.co.kr/kor2
+
 	register addressing mode
 		add ax,bx
 		very limited address space
@@ -50,6 +53,7 @@
 
 #include	"MC95FG308.h"
 #include	"func_def.h"
+#include "def.h"
 #include  "my.h"
 
 
@@ -114,6 +118,8 @@ u8 tick10m_for_long_key=0;  /*if pressed above 2seconds */
 //code u8 FND_DIGIT[11]={0x7E,0x30,0x6D,0x79,0x33,0x5B,0x5F,0x70,0x7F,0x7B};
 u8  FND_DIGIT[12]={0x7E,0x30,0x6D,0x79,0x33,0x5B,0x5F,0x70,0x7F,0x7B,0x4f};
 u8 toggle_fnd_digit=0;  /* for toggle two 7segment  */
+
+u8 adc_waiting=0;
 
 
 rtc_t myclock;
@@ -197,7 +203,7 @@ void INT_Timer0() interrupt 12
 		if(heater_op) 		HEATER_CONTROL_LED=1;
 		if( cold_op )  COLD_CONTROL_LED=1;
 		if( pump_op) PUMP_CONTROL_LED=1;
-		NOP;
+//		NOP;
 		HEATER_CONTROL_LED=0;
 		COLD_CONTROL_LED=0;
 		PUMP_CONTROL_LED=0;
@@ -212,7 +218,7 @@ void INT_Timer0() interrupt 12
 			if(!error_led_toggle)
 			FND_E = 0;  // For Error LED
 		}	
-		NOP;
+//		NOP;
 		FND_LED=1;
 		FND_A=FND_B=FND_C=FND_D=FND_E=1;
 
@@ -477,8 +483,8 @@ void display_led(u8 cont_op,u8 time_op, u8 hot_set,u8 cold_set,u8 err_set)
 	if(hot_set) FND_C = 0;
 	if(cold_set) FND_D = 0;
 	if(err_set) FND_E = 0;
-	NOP;
-	NOP;
+//	NOP;
+//	NOP;
 	FND_LED=1;
 	FND_A=FND_B=FND_C=FND_D=FND_E=1;
 }
@@ -545,8 +551,8 @@ void display_7seg(u8 c)
 	FND_B=~FND_DIGIT[val]>>1&0x01;	
 	FND_A=~FND_DIGIT[val]>>1&0x01;	
 	
-	NOP;
-	NOP;
+//	NOP;
+//	NOP;
 	FND_A=FND_B=FND_C=FND_D=FND_E=FND_F=FND_G=1;
 
 	FND_1=1;
@@ -688,10 +694,12 @@ void main_loop(u8 key)
 			error_set=0;
 			BUZZER_PIN=0;
 		}
-		
+		if(adc_waiting==0)
+			ADC_start(1); //AN1
 
 		if(!ADC_read2(&adc_temperature))
 		{
+			adc_waiting=0;
 			if(adc_temperature == 0x01 || adc_temperature > 0xfff )
 			{
 				temperature_sense_defect=1;
@@ -725,6 +733,8 @@ void main_loop(u8 key)
 			}
 			
 		}
+		else
+			adc_waiting=1;
 		if(reservation_time_changed==1)
 		{
 			reservation_time_changed=0;

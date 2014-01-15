@@ -20,38 +20,17 @@ extern "C" {
 
 
 
-typedef int BOOL;
-#define TRUE 1
-#define FALSE 0
-#ifndef true
-#define  true TRUE
-#endif
-#ifndef false
-#define  false FALSE
-#endif
 
-#ifndef null
-#define null NULL
-#endif
-
-typedef unsigned int	U32;
-typedef signed short S16;
-typedef unsigned short U16;
-typedef unsigned char  U8;
-//typedef int partition_t;
+#define		NOP			_nop_()
 
 
 //#define dprint(...)  //printf(__VA_ARGS__)
 
 
-typedef  unsigned char u8;
-typedef unsigned short u16;
 
 #define MAX_TEMPERATURE 60
 #define TEMPERATURE_RATIO  (0xfff/MAX_TEMPERATURE)
 
-#define ON 1
-#define OFF 0
 
 
 /* Center side  FND */

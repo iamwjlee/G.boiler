@@ -28,124 +28,119 @@
 
 #include	"MC95FG308.h"
 #include	"func_def.h"
+#include  "def.h"
 #include  "my.h"
+#include "eeprom.h"
 
-#define MR_EEPROM 0x40
-#define MR_PROGRAM_ERASE 0x01
-#define MR_PBUFF 0x08
-#define MR_PROGRAM_VFY 0x20
-//#define MR_ERASE_VFY 0x10
-#define MR_ERASE 0x10
-#define MR_PGM 0x20
+// FEMR
+#define FSEL	7
+#define ESEL	6
+#define PGM		5
+#define ERASE	4
+#define PBUFF	3
+#define OTPE	2
+#define VFY		1
+#define FEEN	0
 
-#define CR_RESET 0x02
-#define CR_EXIT 0x30
-#define CR_READ 0x04
+// FECR 
+#define AEF		7
+#define AEE		6
+#define EXIT0 	4
+#define WRITE	3
+#define READ	2
+#define FERST	1
+#define PBRST	0
+#define Eeprom ((volatile unsigned char xdata *) 0)
 
-#define SR_FLAG 0x80
-
-
-void enable_program_mode(u8 option)
+void eeprom_entry(void)
 {
-	if(option==1)
-	{
-		FEDR = 0xa5;
-		FEDR = 0x5a;
-
-	}
-	else
-	{
-		FECR=CR_EXIT;
-	}
-
+	FEDR = 0xA5;
+	FEDR = 0x5A;
 }
-u8 ee_read(u8 offset)
+
+void eeprom_exit(void)
 {
-	/* direct address mode uses external data of 8051 or Indirect address mode uses address SFR*/
-	u8 d;
-	d=*((unsigned char *)(0x3000+offset));
-	return d;
-	
+	FEMR  = 0x00;                 //
+	FECR  = 0x03;                 // nFERST[1], nPBRST[0]
+	FESR  = 0x80;                 // PEVBSY[7] = completed 
+	FETCR = 0x00;                 //
+	FEARL = (unsigned char)(EEPROM_BASE);
+	FEARM = (unsigned char)(EEPROM_BASE>>8);
+	FEARH = 0;
+	FEDR  = 0x00;                 //
+	FETR  = 0x00;                 //
 }
-void ee_page_read()
+
+unsigned char eeprom_read_byte(unsigned int addr)
 {
-	u8 i;
-	u8 d[8];
-	enable_program_mode(1);
 	
-	/* select page buffer */
-	FEMR =MR_EEPROM|MR_PROGRAM_ERASE| MR_PBUFF;
-
-	for(i=0;i<16;i++)
-	{
-		d[i]=FEDR;
-		FEMR |=CR_READ;
-		NOP;
-	}	
-	enable_program_mode(0);
-
-}
-void ee_page_erase()
-{
-	enable_program_mode(1);
-
-	/* reset page buffer */
-	FEMR = MR_EEPROM|MR_PROGRAM_ERASE;
-	FECR = CR_RESET;
-
-	
-	/* select page buffer */
-	FEMR =MR_EEPROM|MR_PROGRAM_ERASE| MR_PBUFF;
-
-	/* write something to page buffer ---------------------------->?? */
-	FEDR = 0;
-	/* set erase mode */
-	FEMR = MR_EEPROM | MR_ERASE|MR_PROGRAM_ERASE;
-	/* set page address. one page=16bytes */
-	FEARH=0x0;	
-	FEARM=0x00;
-	FEARL=0x00;
-	/* set Timer Control Register */
-	FETCR =0x1f;
-	/* start erase */
-	FECR = 0x0b;
-	NOP;
-	
-	/* check status flag==1 */
-	while(!FESR&SR_FLAG);
-	enable_program_mode(0);
+	eeprom_exit();
+    
+   	return Eeprom[addr];
 
 }
 
-void ee_page_write()
+char eeprom_erase_byte(unsigned int addr)
 {
-	enable_program_mode(1);
-	
-	/* reset page buffer */
-	FEMR = MR_EEPROM|MR_PROGRAM_ERASE;
-	FECR = CR_RESET;
-	/* select page buffer */
-	FEMR =MR_EEPROM|MR_PROGRAM_ERASE| MR_PBUFF;
-	/* write something to page buffer ------------------------------> ??*/
-	FEDR = 0x77;  //??
-	/* set write mode */
-	FEMR= MR_EEPROM|MR_PGM|MR_PROGRAM_ERASE;
+	eeprom_entry();
+	// 1. Reset page buffer
+	FEMR = 0x41;
+    FECR = 0x02;
+	// 2. Select page buffer
+    FEMR = 0x49;
+    // 3. Erase data to page buffer
+    Eeprom[addr] = 0x00;
+    // 4. Set page address.
+    FEARL = (unsigned char)addr;
+    FEARM = (unsigned char)(addr>>8);
+    FEARH=0;
+    // 5. Set erase mode
+    FEMR = 0x51;
+    // 6. Set erase time.
+    FETCR = ERSTIME;
+    // 7. Start erase.
+    FECR = 0x0B;
 
-
-	/* set page address. one page=16bytes */
-	FEARH=0x0;	
-	FEARM=0x00;
-	FEARL=0x00;
-	/* set Timer Control Register */
-	FETCR =0x1f;
-	/* start program or erase */
-	FECR = 0x0b;
-	NOP;
-	
-	/* check status flag==1 */
-	while(!FESR&SR_FLAG);
-	enable_program_mode(0);
-
+	while( (FESR & 0x80) != 0);	
+	while( (FESR & 0x80) == 0);
+    
+    eeprom_exit();
+    
+    if( Eeprom[addr] != 0x00) return -1;
+    	
+    return 0;
 }
 
+
+char eeprom_write_byte(unsigned int addr, unsigned char dt)
+{
+	eeprom_entry();
+	// 1. Reset page buffer
+	FEMR = 0x41;
+    FECR = 0x02;
+	// 2. Select page buffer
+    FEMR = 0x49;
+    // 3. Write data to page buffer
+    Eeprom[addr] = dt;
+    // 4. Set page address.
+    FEARL = (unsigned char)addr;
+    FEARM = (unsigned char)(addr>>8);
+    FEARH=0;
+    // 5. Set write mode
+    FEMR = 0x61;
+    // 6. Set erase time.
+    FETCR = PGMTIME;
+    // 7. Start write.
+    FECR = 0x0B;
+
+	while( (FESR & 0x80) != 0);
+	
+	while( (FESR & 0x80) == 0);
+
+	eeprom_exit();
+    
+    if( Eeprom[addr] != dt) return -1;
+    	
+    return 0;
+}
 

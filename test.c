@@ -2,6 +2,7 @@
 
 #include	"MC95FG308.h"
 #include	"func_def.h"
+#include  "def.h"
 #include  "my.h"
 
 #define MAX_Q 5
@@ -141,8 +142,8 @@ void fnd_test_code()
 		FND_B=b;
 		FND_A=a;
 
-		NOP;
-		NOP;
+//		NOP;
+		//NOP;
 		FND_A=FND_B=FND_C=FND_D=FND_E=FND_F=FND_G=1;
 
 		FND_1=1;

@@ -45,10 +45,17 @@ So, upon sensing the first low level, your software should wait 4.752 millisecon
 
 To make sure your software is waiting the correct timing, you need to use a dual channel oscilloscope, and this procedure to adjust your software:
 
+
+
+is HIGH to LOW ?
+
+
 */
 #include	"MC95FG308.h"
 #include	"func_def.h"
+#include "def.h"
 #include  "my.h"
+//#include <intrins.h>
 
 enum ir_status
 {
@@ -124,7 +131,9 @@ void ir_interrupt(void)
 			ir_data |= ir_data_mask;  
 		else if(interval > 0  && interval < 2) /* reference 1.125 ms */
 			//ir_data &= ~(ir_data_mask);
-			NOP;  
+			//NOP;  
+		 {
+		 }
 		else 
 			ir_state = LEADER_DETECT;
 
@@ -149,7 +158,11 @@ void ir_interrupt(void)
 			ir_data |= ir_data_mask;  
 		else if(interval > 0  && interval < 2) /* reference 1.125 ms */
 			//ir_data &= ~(ir_data_mask);
-			NOP;      		
+			//NOP;    
+			{
+				
+				_nop_();
+			}		
 		else 
 			ir_state = LEADER_DETECT;
 
